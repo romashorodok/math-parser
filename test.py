@@ -1,6 +1,7 @@
 from enum import Enum
 import re
 
+
 class TokenType(Enum):
     NUMBER = "NUMBER"
     PLUS = "PLUS"
@@ -13,6 +14,7 @@ class TokenType(Enum):
     ASSIGN = "ASSIGN"
     EOF = "EOF"
 
+
 class Token:
     def __init__(self, type: TokenType, value: str | None):
         self.type = type
@@ -20,6 +22,7 @@ class Token:
 
     def __repr__(self):
         return f"Token({self.type}, {self.value})"
+
 
 class Tokenizer:
     def __init__(self, text: str):
@@ -40,7 +43,9 @@ class Tokenizer:
 
     def variable(self):
         result = ""
-        while self.current_char is not None and re.match(r"[a-zA-Z_]", self.current_char):
+        while self.current_char is not None and re.match(
+            r"[a-zA-Z_]", self.current_char
+        ):
             result += self.current_char
             self.advance()
         return Token(TokenType.VARIABLE, result)
@@ -96,9 +101,11 @@ class Tokenizer:
 
         return Token(TokenType.EOF, None)
 
+
 class Node:
     def evaluate(self, symbol_table):
         raise NotImplementedError("Subclass must implement evaluate method")
+
 
 class NumberNode(Node):
     def __init__(self, token: Token):
@@ -109,6 +116,7 @@ class NumberNode(Node):
 
     def evaluate(self, symbol_table):
         return int(self.token.value)
+
 
 class VariableNode(Node):
     def __init__(self, token: Token):
@@ -123,6 +131,7 @@ class VariableNode(Node):
             return symbol_table[var_name]
         else:
             raise Exception(f"Undefined variable: {var_name}")
+
 
 class BinaryOpNode(Node):
     def __init__(self, left: Node, op: Token, right: Node):
@@ -148,6 +157,7 @@ class BinaryOpNode(Node):
                 raise ZeroDivisionError("Division by zero")
             return left_value / right_value
 
+
 class AssignmentNode(Node):
     def __init__(self, var_node: VariableNode, expr_node: Node):
         self.var_node = var_node
@@ -160,6 +170,7 @@ class AssignmentNode(Node):
         value = self.expr_node.evaluate(symbol_table)
         symbol_table[self.var_node.token.value] = value
         return value
+
 
 class Parser:
     def __init__(self, tokenizer: Tokenizer):
@@ -176,18 +187,20 @@ class Parser:
             self.error()
 
     def factor(self):
-        token = self.current_token
-        if token.type == TokenType.NUMBER:
+        if self.current_token.type == TokenType.NUMBER:
+            token = self.current_token
             self.eat(TokenType.NUMBER)
             return NumberNode(token)
-        elif token.type == TokenType.VARIABLE:
+        elif self.current_token.type == TokenType.VARIABLE:
+            token = self.current_token
             self.eat(TokenType.VARIABLE)
             return VariableNode(token)
-        elif token.type == TokenType.LPAREN:
+        elif self.current_token.type == TokenType.LPAREN:
             self.eat(TokenType.LPAREN)
             node = self.expr()
             self.eat(TokenType.RPAREN)
             return node
+
         self.error()
 
     def term(self):
@@ -212,8 +225,10 @@ class Parser:
 
     def assignment(self):
         var_node = self.factor()
+
         if not isinstance(var_node, VariableNode):
             self.error()
+
         self.eat(TokenType.ASSIGN)
         expr_node = self.expr()
         return AssignmentNode(var_node, expr_node)
@@ -221,28 +236,36 @@ class Parser:
     def parse(self):
         nodes = []
         while self.current_token.type != TokenType.EOF:
-            if self.current_token.type == TokenType.VARIABLE:
+            if (
+                self.current_token.type == TokenType.VARIABLE
+                and self.peek_next_token().type == TokenType.ASSIGN
+            ):
                 nodes.append(self.assignment())
             else:
                 nodes.append(self.expr())
-            if self.current_token.type == TokenType.EOF:
-                break
+                if self.current_token.type == TokenType.EOF:
+                    break
         return nodes
 
-# Example usage:
-text = "x = (2-(2+4+(3-2)))/(2+1)*(2-1)"
+    def peek_next_token(self):
+        pos = self.tokenizer.pos
+        current_char = self.tokenizer.current_char
+        tokenizer = Tokenizer(self.tokenizer.text)
+        tokenizer.pos = pos
+        tokenizer.current_char = current_char
+        return tokenizer.get_next_token()
+
+
+text = "x=(2-(2+4+(3-2)))/(2+1)*(2-1)y=20"
 tokenizer = Tokenizer(text)
 parser = Parser(tokenizer)
 ast_nodes = parser.parse()
 
-# Symbol table for variable storage
 symbol_table = {}
 
-# Evaluate each AST node
 for ast in reversed(ast_nodes):
     result = ast.evaluate(symbol_table)
 
 print(f"AST: {ast_nodes}")
 print(f"Result: {result}")
 print(f"Symbol Table: {symbol_table}")
-
