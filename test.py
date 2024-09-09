@@ -127,6 +127,7 @@ class VariableNode(Node):
 
     def evaluate(self, symbol_table):
         var_name = self.token.value
+        # Like a reference
         if var_name in symbol_table:
             return symbol_table[var_name]
         else:
@@ -256,14 +257,14 @@ class Parser:
         return tokenizer.get_next_token()
 
 
-text = "x=(2-(2+4+(3-2)))/(2+1)*(2-1)y=20"
+text = "x=(2-(2+4+(3-2)))/(2+1)*(2-1)y=x"
 tokenizer = Tokenizer(text)
 parser = Parser(tokenizer)
 ast_nodes = parser.parse()
 
 symbol_table = {}
 
-for ast in reversed(ast_nodes):
+for ast in ast_nodes:
     result = ast.evaluate(symbol_table)
 
 print(f"AST: {ast_nodes}")
