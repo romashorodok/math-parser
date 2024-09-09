@@ -12,6 +12,8 @@ class TokenType(Enum):
     RPAREN = "RPAREN"
     VARIABLE = "VARIABLE"
     ASSIGN = "ASSIGN"
+    COMMA = "COMMA"
+    FUNCTION = "FUNCTION"
     EOF = "EOF"
 
 
@@ -64,7 +66,7 @@ class Tokenizer:
                 continue
 
             if self.current_char.isalpha() or self.current_char == "_":
-                return self.variable()
+                return self.variable_or_function()
 
             if self.current_char.isdigit():
                 return self.number()
@@ -93,6 +95,10 @@ class Tokenizer:
                 self.advance()
                 return Token(TokenType.RPAREN, ")")
 
+            if self.current_char == ",":
+                self.advance()
+                return Token(TokenType.COMMA, ",")
+
             if self.current_char == "=":
                 self.advance()
                 return Token(TokenType.ASSIGN, "=")
@@ -101,10 +107,51 @@ class Tokenizer:
 
         return Token(TokenType.EOF, None)
 
+    def variable_or_function(self):
+        result = ""
+        while self.current_char is not None and re.match(
+            r"[a-zA-Z_]", self.current_char
+        ):
+            result += self.current_char
+            self.advance()
+        return Token(
+            TokenType.FUNCTION if result in ["print"] else TokenType.VARIABLE, result
+        )
+
 
 class Node:
     def evaluate(self, symbol_table):
         raise NotImplementedError("Subclass must implement evaluate method")
+
+
+class FunctionNode(Node):
+    def __init__(self, token: Token):
+        self.token = token
+
+    def __repr__(self):
+        return f"FunctionNode({self.token})"
+
+    def evaluate(self, symbol_table):
+        # This method will handle function calls; details depend on your functions
+        pass
+
+
+class CallNode(Node):
+    def __init__(self, func_node: FunctionNode, args: list[Node]):
+        self.func_node = func_node
+        self.args = args
+
+    def __repr__(self):
+        return f"CallNode({self.func_node}, {self.args})"
+
+    def evaluate(self, symbol_table):
+        func_name = self.func_node.token.value
+        if func_name == "print":
+            args = [arg.evaluate(symbol_table) for arg in self.args]
+            print("stdout:", *args)
+            return None
+        else:
+            raise Exception(f"Undefined function: {func_name}")
 
 
 class NumberNode(Node):
@@ -187,23 +234,6 @@ class Parser:
         else:
             self.error()
 
-    def factor(self):
-        if self.current_token.type == TokenType.NUMBER:
-            token = self.current_token
-            self.eat(TokenType.NUMBER)
-            return NumberNode(token)
-        elif self.current_token.type == TokenType.VARIABLE:
-            token = self.current_token
-            self.eat(TokenType.VARIABLE)
-            return VariableNode(token)
-        elif self.current_token.type == TokenType.LPAREN:
-            self.eat(TokenType.LPAREN)
-            node = self.expr()
-            self.eat(TokenType.RPAREN)
-            return node
-
-        self.error()
-
     def term(self):
         node = self.factor()
 
@@ -234,6 +264,35 @@ class Parser:
         expr_node = self.expr()
         return AssignmentNode(var_node, expr_node)
 
+    def factor(self):
+        if self.current_token.type == TokenType.NUMBER:
+            token = self.current_token
+            self.eat(TokenType.NUMBER)
+            return NumberNode(token)
+        elif self.current_token.type == TokenType.VARIABLE:
+            token = self.current_token
+            self.eat(TokenType.VARIABLE)
+            return VariableNode(token)
+        elif self.current_token.type == TokenType.FUNCTION:
+            token = self.current_token
+            self.eat(TokenType.FUNCTION)
+            self.eat(TokenType.LPAREN)
+            args = []
+            if self.current_token.type != TokenType.RPAREN:
+                args.append(self.expr())
+                while self.current_token.type == TokenType.COMMA:
+                    self.eat(TokenType.COMMA)
+                    args.append(self.expr())
+            self.eat(TokenType.RPAREN)
+            return CallNode(FunctionNode(token), args)
+        elif self.current_token.type == TokenType.LPAREN:
+            self.eat(TokenType.LPAREN)
+            node = self.expr()
+            self.eat(TokenType.RPAREN)
+            return node
+
+        self.error()
+
     def parse(self):
         nodes = []
         while self.current_token.type != TokenType.EOF:
@@ -257,7 +316,9 @@ class Parser:
         return tokenizer.get_next_token()
 
 
-text = "x=(2-(2+4+(3-2)))/(2+1)*(2-1)y=x"
+text = "x = 3 y = 4 t = (2-(2+4+(3-2)))/(2+1)*(2-1) print(t, y + 4, x, x + 2)"
+
+
 tokenizer = Tokenizer(text)
 parser = Parser(tokenizer)
 ast_nodes = parser.parse()
@@ -268,5 +329,4 @@ for ast in ast_nodes:
     result = ast.evaluate(symbol_table)
 
 print(f"AST: {ast_nodes}")
-print(f"Result: {result}")
 print(f"Symbol Table: {symbol_table}")
