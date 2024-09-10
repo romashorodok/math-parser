@@ -1,5 +1,6 @@
 from enum import Enum
 import re
+import math
 
 
 class TokenType(Enum):
@@ -316,7 +317,7 @@ class Parser:
         return tokenizer.get_next_token()
 
 
-text = "x = 3 y = 4 t = (2-(2+4+(3-2)))/(2+1)*(2-1) print(t, y + 4, x, x + 2)"
+text = "x=3y=4t=(2-(2+4+(3-2)))/(2+1)*(2-1)print(t,y+4,x,x+2)c=t"
 
 
 tokenizer = Tokenizer(text)
@@ -330,3 +331,4 @@ for ast in ast_nodes:
 
 print(f"AST: {ast_nodes}")
 print(f"Symbol Table: {symbol_table}")
+print(math.cos(10))
