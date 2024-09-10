@@ -1,2 +1,3 @@
 all:
-	poetry run python main.py
+	poetry run python test.py
+
